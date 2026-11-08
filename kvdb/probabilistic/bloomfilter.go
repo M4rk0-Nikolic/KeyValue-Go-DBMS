@@ -81,10 +81,15 @@ func (bf *BloomFilter)Add(array []byte) {
 }
 
 func (bf BloomFilter)Query() bool{
+	present := false
 	for _, i range b.HashSeeds {
 		offset = i.Hash(array) % uint32(bf.Length)
-		bits.ChangeNthBitTo(&array, offset,  1)
+		if bits.IsNthBitOne(&array, offset) {
+			present = true
+		}
 	}
+	
+	return present
 }
 
 func (bf BloomFilter)Serialize() []byte{
