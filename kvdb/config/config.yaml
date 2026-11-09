@@ -1,0 +1,19 @@
+Mode: "console" # Can be "server" to listen on some port
+BlockManager:
+  - BlockSizeInKB: 0 # Must be 4, 8 or 16
+  - BlockCacheSize: 0
+WAL:
+  - LengthOfSegInBlocks: 0
+Memtable:
+  - MaxSizeInKB: 0
+  - MaxAmountOfEntries: 0
+  - AmountOfMemtablesInMemory: 0
+Cache:
+  - SizeInKB: 0
+DataCopies:
+  - BackupUsed: ""
+TokenBucket:
+  - NumberOfTokens: 0
+  - ResetIntervalInMs: 0
+
+

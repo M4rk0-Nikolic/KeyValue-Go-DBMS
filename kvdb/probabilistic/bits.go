@@ -28,3 +28,7 @@ func IsNthBitOne(array *[]uint64, n uint){
 		return True
 	}
 }
+
+func NumberOfTrailingZeros(){
+	// for hyper log log
+}

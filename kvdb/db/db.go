@@ -8,7 +8,8 @@ import (
 
 
 type DB struct {
-
+	BlockManager *bm.BlockManager
+	WAL *wal.SegWAL
 }
 
 

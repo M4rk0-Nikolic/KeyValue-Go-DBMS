@@ -99,6 +99,7 @@ func (bf BloomFilter)Serialize() []byte{
 	binary.LittleEndian.PutUint64(serial[offset:offset+8], uint64(len(bf.Array)))
 	offset += 8
 	binary.LittleEndian.PutUint64(serial[offset:offset+8], uint64(len(bf.HashSeeds)))
+	offset += 8
 
 	//binary.LittleEndian.PutUint64(serial, uint64(len(bf.HashSeeds)))
 	//binary.LittleEndian.PutUint64(serial, uint64(len(bf.HashSeeds))) // need to loop over and over with offset for the writer below is optimization
@@ -110,4 +111,24 @@ func (bf BloomFilter)Serialize() []byte{
 	copy(serial[offset:], seedBytes)
 
 	return serial
+}
+
+func (bf *BloomFilter)Deserialize(array []byte){
+	offset := 0
+	
+	lenarray := binary.LittleEndian.Uint64(array[offset:offset+8])
+	offset += 8
+	lenhashes := binary.LittleEndian.Uint64(array[offset:offset+8])
+	offset += 8
+
+	bf.Array = make([]uint64, lenarray)
+	bf.HashSeeds = make([]uint32, lenhashes)
+
+	bfArrayBytes := unsafe.Slice((*byte)(unsafe.Pointer(&bf.Array[0])), lenarray*8)
+	copy(bfArrayBytes, array[offset : offset+int(lenarray*8)])
+	offset += int(lenarray * 8)
+
+	bfSeedBytes := unsafe.Slice((*byte)(unsafe.Pointer(&bf.HashSeeds[0])), lenhashes*4)
+	copy(bfSeedBytes, array[offset : offset+int(lenhashes*4)])
+
 }
