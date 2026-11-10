@@ -13,31 +13,21 @@ type DB struct {
 }
 
 
-func (d *DB) Get(key any) ([]byte, error){
-	var keyBytes []byte
+func (d *DB) Get(key string) ([]byte, error){
 
-	switch v := key.(type){
-	case string:
-		keyBytes = []byte(v)
-	case []byte:
-		keyBytes = v
-	default:
-		return nil, errors.New("Incorrect type passed. Get only supports string or []byte types.")
-	}
-	
-	return keyBytes, nil
+	return []byte(), nil
 }
 
-func (d *DB) PUT(key any, value []byte) error{
-	var keyBytes []byte
+func (d *DB) PUT(key string, value any) error{
+	var valueBytes []byte
 
-	switch v := key.(type){
+	switch v := valueBytes.(type){
 	case string:
-		keyBytes = []byte(v)
+		valueBytes = []byte(v)
 	case []byte:
-		keyBytes = v
+		valueBytes = v
 	default:
-		return errors.New("Incorrect type passed. PUT only supports string or []byte types.")
+		return errors.New("Incorrect type passed to value parameter. PUT only supports string or []byte value types.")
 	}
 	
 	return nil
