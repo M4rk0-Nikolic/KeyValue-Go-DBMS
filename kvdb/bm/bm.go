@@ -123,7 +123,8 @@ func (bm *BlockManager) WriteBlock(path string, blockNumber uint64, data []byte)
 	block := make([]byte, bm.BlockSizeBytes)
 
 	file.WriteAt(block, int64(offset))
-	syscall.Fdatasync(int(file.Fd()))
+	//syscall.Fdatasync(int(file.Fd()))
+	os.Sync(file)
 
 	if err != nil {
 		log.Println("Failed to write block.")

@@ -1,7 +1,8 @@
 package skiplist
 
 import (
-	"random"
+	"math/rand"
+	"fmt"
 	"container/list"
 )
 
