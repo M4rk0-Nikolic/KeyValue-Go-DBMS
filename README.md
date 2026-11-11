@@ -1,6 +1,17 @@
 # Key Value DataBase Managment System written in Golang
 Written for linux and other POSIX or POSIX-compliant operating systems. Optimized for large amounts of write operations therefore poorer for read heavy applications.
 All Docker configuration files (`Dockerfile`, `docker-compose.yml`, `.dockerignore`) can be found in the root directory. `configuration.yml` allows for changes to the behaviour of the system.
+# What is implemented:
+- Memtables (B-Tree, 
+- Segmented WAL
+- SSTables with their respective parts (compression, data, index, summary, filter, MANIFEST)
+- LSM tree
+- Probabalistic data structures
+
+# What is not implemented:
+- No Copy Techniques
+- MVCC
+
 # Supported Operations:
 - PUT(key,  value)
 - GET(key) -> value
@@ -8,5 +19,7 @@ All Docker configuration files (`Dockerfile`, `docker-compose.yml`, `.dockerigno
 - PREFIX_SCAN(prefix, pageNumber, pageSize) -> [page](key, value)
 - RANGE_SCAN(range, pageNumber, pageSize) -> [page](key, value)
 - PREFIX_ITERATE(prefix) -> iterator
-- RANGE_ITERATE(range) -> iterato
+- RANGE_ITERATE(range) -> iterator
+- BATCH_WRITE()
+- BATCH_DELETE()
 
