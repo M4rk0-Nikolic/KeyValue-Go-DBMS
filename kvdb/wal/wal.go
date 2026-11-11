@@ -45,13 +45,18 @@ type WALFragment struct {
 	Payload []byte
 }
 
-type WALEntry struct {
-	Timestamp uint64
+type WALOperation struct {
 	Tombstone bool
 	KeySize uint64
 	ValueSize uint64
 	Key []byte
 	Value []byte
+}
+
+type WALEntry struct {
+	Timestamp uint64
+	NumberOfOperations uint16
+	Operations []WALOperation
 	TC uint64
 }
 
@@ -69,30 +74,36 @@ type SegWAL struct {
 	BlockManager *bm.BlockManager
 }
 
-func (segwal SegWAL) SyncHotSegment() error{
-	if file, err := os.Openfile(segwal.HotSegment, O_RDONLY, 0644); err == nil {
-		file.Sync()
-		file.Close()
-		return nil
-	}
-	return err
-}
-
-func (wale WALEntry)Serialize() []byte{
-	length := TOTAL + len(wale.Key) + len(wale.Value)
+func (op WALOperation)Serialize() []byte{
+	length := len(op.Key) + len(op.Value) + TOMBSTONE_SIZE + KEY_SIZE_SIZE + VALUE_SIZE_SIZE
 	serialized := make([]byte, length)
 	offset := 0
-	binary.LittleEndian.PutUint64(wale.Timestamp, serialized[offset:offset+8])
-	offset += TIMESTAMP_SIZE
-	serialized[offset] = byte(wale.Tombstone)
-	offset += TOMBSTONE_SIZE
-	binary.LittleEndian.PutUint64(wale.KeySize, serialized[offset:offset+8])
+	if op.Tombstone {
+        serialized[offset] = 1
+    }
+    offset += TOMBSTONE_SIZE
+	binary.LittleEndian.PutUint64(serialized[offset:offset+8], op.KeySize)
 	offset += KEY_SIZE_SIZE
-	binary.LittleEndian.PutUint64(wale.ValueSize, serialized[offset:offset+8])
+	binary.LittleEndian.PutUint64(serialized[offset:offset+8], op.ValueSize)
 	offset += VALUE_SIZE_SIZE
-	offset += copy(serialized[offset:], wale.Key)
-	offset += copy(serialized[offset:], wale.Value)
-	binary.LittleEndian.PutUint64(wale.TC, serialized[offset:offset+8])
+	offset += copy(serialized[offset:], op.Key)
+	offset += copy(serialized[offset:], op.Value)
+	return serialized
+}
+
+
+func (wale WALEntry)Serialize() []byte{
+	serialized := make([]byte, TIMESTAMP_SIZE + NUMBER_OF_OPERATIONS_SIZE)
+	offset := 0
+	binary.LittleEndian.PutUint16(wale.Timestamp, serialized[offset:offset+8])
+	offset += TIMESTAMP_SIZE
+	binary.LittleEndian.PutUint16(wale.NumberOfOperations, serialized[offset:offset+2])
+	for _, op := range wale.Operations{
+		serialized = append(serialized, op.Serialize()...)
+	}
+	tc := make([]byte, TC_SIZE)
+    binary.LittleEndian.PutUint64(tc, entry.TC)
+    serialized = append(serialized, tc...)
 
 	return serialized
 }
@@ -107,11 +118,7 @@ func GetSegPath(num uint16) {
 	return str
 }
 
-func CRC32(data []byte) uint32 {
-	return crc32.ChecksumIEEE(data)
-}
-
-func NewSegWAL(bm *bm.BlockManager) *SegWAL{
+func (segwal SegWAL)Recover(memtable *memtable.Memtable){
 	err := os.MkdirAll("../data/wal", 0755)
 	if err != nil {
 		return err
@@ -122,32 +129,31 @@ func NewSegWAL(bm *bm.BlockManager) *SegWAL{
 		return err2
 	}
 
-	var wal_logs []WALSegment = make([]WALSegment, 0)
+	var wal_logs []WALSegment = []WALSegment{}
 
 	for _, entry := range entries{
 		if !entry.IsDir(){
 			if (strings.HasPrefix(entry.Name(), "wal_")) &&  (strings.HasSufix(entry.Name(), ".log")){
-				wal_logs = append(wal_logs, WALSegment{ SequenceNumber: uint16(_) Path: entry })
+				wal_logs = append(wal_logs, WALSegment{ SequenceNumber: uint16(_) Path: entry.Name() })
 			}
 		}
 	}
 
-	// Need to implement other things before finishing this
+	// Determine which WAL Segments have been flushed to disk via MANIFEST file
+	// Remaining WAL Segments need to be replayed
 
-	SegWAL{
-		BlockManager: bm
-		Segments : wal_logs
-	}
+	toBeReplayed := entries
+
+	for
 
 }
 
 func (segwal *SegWAL) SwapSegment() {
-	segwal.SyncHotSegment()
 	old_num := segwal.HotSegment.SequenceNumber
 	new_seg := WALSegment{ SequenceNumber: uint16(old_num + 1) Path: GetSegPath(old_num + 1) }
 	segwal.Segments = append(segwal.Segments, segwal.HotSegment)
-	segwal.HotSegment =  new_seg
-	os.CreateFile(new_seg.Path)
+	segwal.HotSegment = new_se
+	segwal.SegmentBytes = 0
 }
 
 func SerializeFragment(fragment WALFragment) {
@@ -161,7 +167,7 @@ func SerializeFragment(fragment WALFragment) {
 	return result
 }
 
-func (segwal *SegWAL) AppendRecordUnBuffered(record record.Record) error{
+func (segwal *SegWAL) Append(record record.Record) error{
 	if segwal.HotSegment == nil | len(segwal.Segments) == 0 {
 		newseg := WALSegment {
 			SequenceNumber: 1,
@@ -171,42 +177,39 @@ func (segwal *SegWAL) AppendRecordUnBuffered(record record.Record) error{
 		segwal.HotSegment = newseg
 	}
 
-	file, err := os.OpenFile(segwal.HotSegment.Path, O_CREATE | O_APPEND, 0644)
-	if err != nil{
-		log.Fatal("Can not open log file.")
-	}
-	defer file.Close()
+	segmentSize := segwal.BlockSize * wal.BlocksInSegment
+	blockIndex := tipOffset / wal.BlockSize
 
 	first := true
 	walentry := WALEntry {
-		Timestamp: time.Now().Unix()
-		Tombstone: record.Tombstone
-		Key: record.Key
-		Value: record.Value
-		KeySize: len(record.Key)
-		ValueSize: len(record.Value)
+		Timestamp: time.Now().Unix(),
+		NumberOfOperations: 1,
+		Operations: []WALOperation{WALOperation{
+			Tombstone: record.Tombstone
+			Key: record.Key
+			Value: record.Value
+			KeySize: len(record.Key)
+			ValueSize: len(record.Value)
+		}},
 		TC: 0xDEADBEEFFEEDFACE
 		}
 	data := walentry.Serialize()
 
-	total_size := segwal.BlockSize * wal.BlocksInSegment
-
 	for len(data) > 0 {
-		if segwal.SegmentBytes == total_size {
+		block := BlockManager.ReadBlock(segwal.HotSegment.Path, blockIndex)
+		
+		if segwal.SegmentBytes == segmentSize {
 			if err := segwal.SwapSegment(); err != nil {
 				return err
 			}
+			blockIndex = 0
 		}
 
-		remaining := total_size - (wal.SegmentBytes % segwal.BlockSize)
+		remaining := segmentSize - (wal.SegmentBytes % segwal.BlockSize)
 
 		if remaining < TOTAL {
-			if file, err := os.OpenFile(segwal.HotSegment.Path, O_APPEND, 0644); err != nil{
-				return err
-			}
-			file.Write(make([]byte, remaining))
-			file.Sync()
-			file.Close()
+			copy(block[segwal.BlockSize - remaining: segwal.BlockSize], make([]byte, remaining))
+			segwal.BlockManager.Write(segwal.HotSegment.Path, blockIndex, block)
 		}
 
 		n := min(len(data), remaining-7)
@@ -226,27 +229,23 @@ func (segwal *SegWAL) AppendRecordUnBuffered(record record.Record) error{
 
 		payload := data[:n]
 
-		SerializeFragment(WALFragment{ 
+		copy(block[segwal.BlockSize-remaining:], SerializeFragment(WALFragment{ 
 			Type: typ,
 			Payload: payload,
-			Hash := CRC32(payload),
+			Hash := crc32.ChecksumIEEE(payload),
 			Size := len(payload)
-		})
+		}))
+
+		BlockManager.WriteBlock(segwal.HotSegment.Path, blockIndex, block)
+
+		if type != Full{
+			blockIndex += 1
+		}
 
 		segwal.SegmentBytes += uint64(7 + n)
 
 		data = data[n:]
 		first = false
 	}
-
-}
-
-
-func (segwal *SegWAL) ReadSegment(record record.Record) {
-
-}
-
-
-func (segwal *SegWAL) AppendRecordBuffered(record record.Record) {
 
 }

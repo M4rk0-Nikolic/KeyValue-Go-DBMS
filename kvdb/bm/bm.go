@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 	"container/list"
-	"runtime" // To be used to detrmine whether running on Linux
-	"syscall" // fdatasync and fsync, difference being fsync syncs meta data as well, fdatasync syncs data and only critical meta data
+	"runtime"
+	"syscall"
 )
 
 type BlockID struct {
@@ -120,10 +120,10 @@ func (bm *BlockManager) WriteBlock(path string, blockNumber uint64, data []byte)
 	defer file.Close()
 
 	offset := int64(bm.BlockSizeBytes*blockNumber)
-	block := make([]byte, bm.BlockSizeBytes)
-
-	file.WriteAt(block, int64(offset))
-	//syscall.Fdatasync(int(file.Fd()))
+	if len(data) != bm.BlockSizeBytes {
+		return errors.New("Data passed was less than or more than the configured block size.")
+	}
+	file.WriteAt(data, int64(offset))
 	os.Sync(file)
 
 	if err != nil {
@@ -132,7 +132,7 @@ func (bm *BlockManager) WriteBlock(path string, blockNumber uint64, data []byte)
     }
 
 	if _, present := bm.Blocks[blockid]; present {
-		bm.Add(Block{ ID: blockid, Data: data}) // If in cache update, but do not insert if not in cache
+		bm.Add(Block{ ID: blockid, Data: data }) // If in cache update, but do not insert if not in cache
 	}
 
 	return nil
