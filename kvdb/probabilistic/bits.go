@@ -1,4 +1,4 @@
-package bits
+package probabilistic
 
 func ChangeNthBitTo(array *[]uint64, n uint, flag uint) { // flag  0 to set to 0, 1 to set to 1, 2 to flip
 	len := array.Len()

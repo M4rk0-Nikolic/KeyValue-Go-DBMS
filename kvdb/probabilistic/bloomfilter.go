@@ -1,4 +1,4 @@
-package bloomfilter
+package probabilistic
 
 import (
 	"fmt"
@@ -76,7 +76,7 @@ func CreateBloomFilter(expectedElements uint, falsePositiveRate float64) *BloomF
 func (bf *BloomFilter)Add(array []byte) {
 	for _, i range b.HashSeeds {
 		offset = i.Hash(array) % uint32(bf.Length)
-		bits.ChangeNthBitTo(&array, offset,  1)
+		ChangeNthBitTo(&array, offset,  1)
 	}
 }
 
@@ -84,7 +84,7 @@ func (bf BloomFilter)Query() bool{
 	present := false
 	for _, i range b.HashSeeds {
 		offset = i.Hash(array) % uint32(bf.Length)
-		if bits.IsNthBitOne(&array, offset) {
+		if IsNthBitOne(&array, offset) {
 			present = true
 		}
 	}

@@ -1,4 +1,4 @@
-package hyperloglog
+package probabilistic
 
 
-// lease look at bits.go
+// please put bit manipulation functions in bits.go
