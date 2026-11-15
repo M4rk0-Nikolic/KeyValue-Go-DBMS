@@ -101,47 +101,71 @@ func (segwal SegWAL)Recover(memtable *memtable.Memtable){
 
 	fragmentStarted := false
 
+	var walEntries []Entry = make([]Entry, 0)
+
 	buffer := []byte{}
 
 	for index, entry := range toBeReplayed {
-		walEntry := []byte{}
 		for currentBlock := 0 ; currentBlock < maxBlock ; currentBlock++ {
 			data := segwal.BlockManager.ReadBlock(entry.Name(), currentBlock)
-			for ;;{
+			for !(len(data) < 7) {
 				fragmentHeader := data[:7]
-				crc32 := binary.LittleEndian.Uint32(fragmentHeader)
+				expectedCrc32 := binary.LittleEndian.Uint32(fragmentHeader)
 				size := binary.LittleEndian.Uint16(fragmentHeader[4:])
 				typ := FragmentType(fragmentHeader[6])
 
 				switch typ{
 				case Full:
-					if crc32 != crc32.ChecksumIEEE(data[7:size]){
+					if expectedCrc32 != crc32.ChecksumIEEE(data[7:7+int(size)]){
 						log.Println("Failed to recover one record.")
-						buffer = []byte{}
-					}
-					buffer = append(buffer, data[7:size])
-					break
-				case End:
-					if fragmentStarted == false {
-						data = data[7+size:]
 						continue
 					}
+					entry := DeserializeWALEntry(data[7:7+int(size)])
+					if entry.TC != 0xDEADBEEFFEEDFACE{
+						log.Println("Failed to recover one record.")
+						continue
+					}
+					walEntries = append(walEntries, entry)
+					continue
 				case Start:
 					fragmentStarted = true
-					
-				case End:
-					fragmentStarted = false
-
+					if expectedCrc32 != crc32.ChecksumIEEE(data[7:7+int(size)]){
+						log.Println("Failed to recover one record.")
+						fragmentStarted = false
+						continue
+					}
+					buffer = append(buffer, data[7:7+int(size)])
+					continue
 				case Middle:
-					
+					if (expectedCrc32 != crc32.ChecksumIEEE(data[7:7+int(size)])) || fragmentStarted == false{
+						log.Println("Failed to recover one record.")
+						fragmentStarted = false
+						buffer = []byte{}
+						continue
+					}
+					buffer = append(buffer, data[7:7+int(size)])
+					continue
+				case End:
+					if (expectedCrc32 != crc32.ChecksumIEEE(data[7:7+int(size)])) || fragmentStarted == false{
+						log.Println("Failed to recover one record.")
+						fragmentStarted = false
+						buffer = []byte{}
+						continue
+					}
+					entry := DeserializeWALEntry(data[7:7+int(size)])
+					if entry.TC != 0xDEADBEEFFEEDFACE{
+						log.Println("Failed to recover one record.")
+						continue
+					}
+					buffer = append(buffer, data[7:7+int(size)])
+					walEntries = append(walEntries, entry)
+					buffer = []byte{}
+					continue
 				}
-
 				data = data[7+size:]
 			}
-			DeserializeWALEntry()
 		}
 	}
-
 }
 
 func (segwal *SegWAL) SwapSegment() {
@@ -152,7 +176,7 @@ func (segwal *SegWAL) SwapSegment() {
 	segwal.SegmentBytes = 0
 }
 
-func (segwal *SegWAL) Append(record record.Record) error{
+func (segwal *SegWAL) Append(records []record.Record) error{
 	if segwal.HotSegment == nil | len(segwal.Segments) == 0 {
 		newseg := WALSegment {
 			SequenceNumber: 1,
@@ -168,16 +192,19 @@ func (segwal *SegWAL) Append(record record.Record) error{
 	first := true
 	walentry := Entry {
 		Timestamp: time.Now().Unix(),
-		NumberOfOperations: 1,
-		Operations: []Operation{Operation{
+		NumberOfOperations: uint8(len(records)),
+		Operations: []Operation{},
+		TC: 0xDEADBEEFFEEDFACE
+		}
+	for _, record := range records {
+	walentry.Operations = append(walentry.Operations, Operation{
 			Tombstone: record.Tombstone
 			Key: record.Key
 			Value: record.Value
 			KeySize: len(record.Key)
 			ValueSize: len(record.Value)
-		}},
-		TC: 0xDEADBEEFFEEDFACE
-		}
+		})
+	}
 	data := walentry.Serialize()
 
 	for len(data) > 0 {
@@ -232,5 +259,4 @@ func (segwal *SegWAL) Append(record record.Record) error{
 		data = data[n:]
 		first = false
 	}
-
 }
