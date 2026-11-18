@@ -135,10 +135,11 @@ func SerializeFragment(fragment Fragment) []byte{
 	
 	binary.LittleEndian.PutUint32(result, fragment.Hash)
 	binary.LittleEndian.PutUint16(result[CrcSize:], fragment.Size)
+	result[CrcSize+SizeSize] = byte(fragment.Type)
 
 	result[CrcSize+SizeSize] = byte(fragment.Type)
 
-	copy(result[SizeSize + CrcSize:], fragment.Payload)
+	copy(result[SizeSize + CrcSize + TypeSize:], fragment.Payload)
 
 	return result
 }
