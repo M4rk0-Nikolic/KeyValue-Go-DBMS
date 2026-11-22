@@ -9,6 +9,7 @@ import (
 	"hash/crc32"
 	"strconv"
 	bm "github.com/M4rk0-Nikolic/KeyValue-Go-DBMS"
+	"github.com/M4rk0-Nikolic/KeyValue-Go-DBMS/config"
 )
 
 type WAL interface {
@@ -54,13 +55,14 @@ type WALSegment struct {
 }
 
 type SegWAL struct {
-	BlockSize uint64
-	BlocksInSegment uint64
 	SegmentBytes uint64
 	Segments []WALSegment
 	HotSegment WALSegment
 	BlockManager *bm.BlockManager
 }
+
+var BlockSize uint64 = config.Global.BlockManager.BlockSizeInKB * 1024
+var BlocksInSegment uint64 = config.Global.WAL.LengthOfSegInBlocks
 
 func GetSegPath(num uint16) {
 	str := strconv.FormatUint(uint64(num), 10)
@@ -97,7 +99,7 @@ func (segwal SegWAL)Recover(memtable *memtable.Memtable){
 	// Remaining WAL Segments need to be replayed
 
 	toBeReplayed := entries
-	maxBlock := wal.BlocksInSegment
+	maxBlock := BlocksInSegment
 
 	fragmentStarted := false
 
@@ -186,8 +188,8 @@ func (segwal *SegWAL) Append(records []record.Record) error{
 		segwal.HotSegment = newseg
 	}
 
-	segmentSize := segwal.BlockSize * segwal.BlocksInSegment
-	blockIndex := segwal.SegmentBytes / segwal.BlockSize
+	segmentSize := BlockSize * BlocksInSegment
+	blockIndex := segwal.SegmentBytes / BlockSize
 
 	first := true
 	walentry := Entry {
@@ -217,10 +219,10 @@ func (segwal *SegWAL) Append(records []record.Record) error{
 			blockIndex = 0
 		}
 
-		remaining := segmentSize - (segwal.SegmentBytes % segwal.BlockSize)
+		remaining := segmentSize - (segwal.SegmentBytes % BlockSize)
 
 		if remaining < TOTAL {
-			copy(block[segwal.BlockSize - remaining: segwal.BlockSize], make([]byte, remaining))
+			copy(block[BlockSize - remaining: BlockSize], make([]byte, remaining))
 			segwal.BlockManager.Write(segwal.HotSegment.Path, blockIndex, block)
 		}
 
@@ -241,7 +243,7 @@ func (segwal *SegWAL) Append(records []record.Record) error{
 
 		payload := data[:n]
 
-		copy(block[segwal.BlockSize-remaining:], SerializeFragment(Fragment{ 
+		copy(block[BlockSize-remaining:], SerializeFragment(Fragment{ 
 			Type: typ,
 			Payload: payload,
 			Hash := crc32.ChecksumIEEE(payload),

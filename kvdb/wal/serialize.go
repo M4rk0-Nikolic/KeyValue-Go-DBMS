@@ -131,12 +131,11 @@ func DeserializeEntry(data []byte) (Entry, int, error) {
 }
 
 func SerializeFragment(fragment Fragment) []byte{
-	result := make([]byte, fragment.Size + SizeSize + CrcSize)
+	result := make([]byte, fragment.Size + SizeSize + CrcSize + TypeSize)
 	
-	binary.LittleEndian.PutUint32(result, fragment.Hash)
+	binary.LittleEndian.PutUint32(result, fragment.CRC)
 	binary.LittleEndian.PutUint16(result[CrcSize:], fragment.Size)
-	result[CrcSize+SizeSize] = byte(fragment.Type)
-
+	
 	result[CrcSize+SizeSize] = byte(fragment.Type)
 
 	copy(result[SizeSize + CrcSize + TypeSize:], fragment.Payload)

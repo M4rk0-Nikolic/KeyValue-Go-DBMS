@@ -7,6 +7,7 @@ import (
 	"container/list"
 	"runtime"
 	"syscall"
+	"github.com/M4rk0-Nikolic/KeyValue-Go-DBMS/config"
 )
 
 type BlockID struct {
@@ -19,28 +20,18 @@ type Block struct {
 	Data []byte
 }
 
+var BlockSize uint64 = config.Global.BlockManager.BlockSizeInKB * 1024
+var BlockCacheSizeKB uint64 = config.Global.BlockManager.BlockCacheSize
 
 // Map for O(1) point search (Blocks)
 // Doubly Linked List for O(1) insertions (LRUEvictionOrder)
 type BlockManager struct {
-	BlockSizeBytes uint64
-	BlockCacheSizeKB uint64
 	Blocks map[BlockID]*list.Element
 	LRUEvictionOrder list.List
 }
 
 func NewBlockManager() *BlockManager {
-	var defBlockSize uint64
-	var defBlockCacheSize uint64
-	
-	// Read config yaml file here, either have a seperate .go file for reading .yaml file and somehow share it as a global variable OR read when needed; also which lib for reading yaml?
-	// Also need to perfom check that BlockSizeBytes is multiple of BlockCacheSizeKB * 1024
-	// and that cache is non-zero
-
     return &BlockManager{
-        BlockSizeBytes: 4096,
-        BlockCacheSizeKB: 1024,
-
         Blocks: make(map[BlockID]*list.Element),
     }
 }
@@ -51,7 +42,7 @@ func (bm *BlockManager) Add(block Block) {
 	// Not in cache
 	if element, present := bm.Blocks[id]; !present {
 		// Full Block cache
-		if bm.LRUEvictionOrder.Len() == int(bm.BlockCacheSizeKB * 1024 / bm.BlockSizeBytes){ // Assumes that BlockSizeBytes is a multiple of bm.BlockCacheSizeKB * 1024
+		if bm.LRUEvictionOrder.Len() == int(BlockCacheSizeKB * 1024 / BlockSize){ // Assumes that BlockSize is a multiple of BlockCacheSizeKB * 1024
 			last := bm.LRUEvictionOrder.Back()
 			old := last.Value.(Block)
 			delete(bm.Blocks, old.ID)
@@ -91,8 +82,8 @@ func (bm *BlockManager) ReadBlock(path string, blockNumber uint64) ([]byte, erro
 	}
 	defer file.Close()
 
-	offset := int64(bm.BlockSizeBytes*blockNumber)
-	block := make([]byte, int64(bm.BlockSizeBytes))
+	offset := int64(BlockSize*blockNumber)
+	block := make([]byte, int64(BlockSize))
 
 	_, err := file.ReadAt(block, offset)
 	if err != nil {
@@ -119,8 +110,8 @@ func (bm *BlockManager) WriteBlock(path string, blockNumber uint64, data []byte)
 
 	defer file.Close()
 
-	offset := int64(bm.BlockSizeBytes*blockNumber)
-	if len(data) != bm.BlockSizeBytes {
+	offset := int64(BlockSize*blockNumber)
+	if len(data) != BlockSize {
 		return errors.New("Data passed was less than or more than the configured block size.")
 	}
 	file.WriteAt(data, int64(offset))

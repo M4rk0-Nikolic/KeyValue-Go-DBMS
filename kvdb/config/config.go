@@ -6,15 +6,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-
-file, err := os.ReadFile("config.yaml")
-var GenericMap map[string]any
-
-if err != nil{
-	log.Println("Failed to open and read config.yaml - using defaults instead.")
+type Config struct {
+    BlockManager BlockManagerConfig `yaml:"BlockManager"`
+	WAL WALConfig `yaml:"WAL"`
 }
 
-err := yaml.Unmarshal(yamlFile, &GenericMap)
-if err != nil{
-	log.Println("Failed to open and read config.yaml - using defaults instead.")
+type BlockManagerConfig struct {
+    BlockSizeInKB uint64 `yaml:"BlockSizeInKB"`
+	BlockCacheSize uint64 `yaml:"BlockCacheSize"`
+}
+
+type WALConfig struct {
+    LengthOfSegInBlocks uint64 `yaml:"LengthOfSegInBlocks"`
+}
+func LoadConfig(){
+	file, err := os.ReadFile("config.yaml")
+	var Global Config
+
+	if err != nil{
+		log.Println("Failed to open and read config.yaml - using defaults instead.")
+	}
+
+	err2 := yaml.Unmarshal(file, &Global)
+	if err2 != nil{
+		log.Println("Failed to open and read config.yaml - using defaults instead.")
+	}
 }

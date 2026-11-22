@@ -2,15 +2,11 @@
 Written for linux and other POSIX or POSIX-compliant operating systems. Optimized for large amounts of write operations therefore poorer for read heavy applications.
 All Docker configuration files (`Dockerfile`, `docker-compose.yml`, `.dockerignore`) can be found in the root directory. `configuration.yml` allows for changes to the behaviour of the system.
 # What is implemented:
-- Memtables (B-Tree, 
+- Memtables 
 - Segmented WAL
 - SSTables with their respective parts (compression, data, index, summary, filter, MANIFEST)
 - LSM tree
 - Probabalistic data structures
-
-# What is not implemented:
-- No Copy Techniques
-- MVCC
 
 # Supported Operations:
 - PUT(key,  value)
